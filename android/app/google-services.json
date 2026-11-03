@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "982114121473",
+    "project_id": "gym-notebook-a356a",
+    "storage_bucket": "gym-notebook-a356a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:982114121473:android:a849bd205e2fa37a96cd00",
+        "android_client_info": {
+          "package_name": "com.example.gym_notebook"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBoIU2KgJWkmWpfjvHSC6C7Z9FX79KXh8s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
