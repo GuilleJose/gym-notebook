@@ -29,7 +29,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
   final Map<String, double> _rmRecords = {};
   final Map<String, Map<int, _LastSetRecord>> _lastSetRecords = {};
   final Map<String, Map<int, ProgressionTarget>> _progressionTargets = {};
-  final Map<String, Map<int, int>> _selectedRir = {};
   final Map<String, bool> _reduceNextLoad = {};
   final Map<String, List<_LastSetRecord>> _latestSessionSets = {};
   final Map<String, bool> _latestDeloadFlags = {};
@@ -61,7 +60,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
       _weights[exercise.id] = TextEditingController();
       _reps[exercise.id] = TextEditingController();
       _results[exercise.id] = [];
-      _selectedRir[exercise.id] = {};
       _reduceNextLoad[exercise.id] = false;
     }
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -281,7 +279,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
     final previous = _results[exercise.id]!;
     final rm = SetModel.calculateRM(weight, reps);
     final setNumber = previous.length + 1;
-    final rir = _selectedRir[exercise.id]?[setNumber] ?? 2;
+    const rir = 2;
     setState(() {
       previous.add({
         'setNumber': setNumber,
@@ -620,7 +618,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                       label: Text(
                         isCardio
                             ? 'Cardio · $durationMinutes min'
-                            : '${sets[index]['weight']} kg × ${sets[index]['reps']} · RIR ${sets[index]['rir'] ?? '--'}',
+                          : '${sets[index]['weight']} kg × ${sets[index]['reps']}',
                       ),
                       deleteIcon: const Icon(Icons.close, size: 16),
                       onDeleted: () => _removeSet(exercise, index),
@@ -661,7 +659,9 @@ class _TrainingScreenState extends State<TrainingScreen> {
                             suffixText: 'kg',
                             helperText: progressionTarget != null
                                 ? 'Sugerido: ${_formatWeight(progressionTarget.weight)} kg'
-                                : 'Serie $nextSet anterior: ${previousSet == null ? 'sin registro' : '${_formatWeight(previousSet.weight)} kg'}',
+                              : previousSet == null
+                              ? null
+                              : _formatWeight(previousSet.weight),
                             isDense: true,
                           ),
                         ),
@@ -675,9 +675,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                             labelText: 'Reps',
                             helperText: progressionTarget != null
                                 ? 'Sugeridas: ${progressionTarget.reps}'
-                                : previousSet == null
-                                ? 'Últimas repeticiones: --'
-                                : 'Últimas repeticiones: ${previousSet.reps}',
+                              : previousSet?.reps.toString(),
                             isDense: true,
                           ),
                         ),
@@ -689,43 +687,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
                         icon: const Icon(Icons.add),
                       ),
                     ],
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'RIR',
-                          style: TextStyle(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        DropdownButton<int>(
-                          value: _selectedRir[exercise.id]?[nextSet] ?? 2,
-                          underline: const SizedBox.shrink(),
-                          isDense: true,
-                          items: List.generate(
-                            4,
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text('$value'),
-                            ),
-                          ),
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                _selectedRir[exercise.id]![nextSet] = value;
-                              });
-                            }
-                          },
-                        ),
-                      ],
-                    ),
                   ),
                   if (progressionTarget != null)
                     Padding(

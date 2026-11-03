@@ -168,13 +168,6 @@ class HomeScreen extends StatelessWidget {
             '${workout.targetDurationMinutes} minutos previstos',
           ),
 
-        if (workout.circuitRounds != null)
-          _infoChip(
-            context,
-            Icons.repeat,
-            '${workout.circuitRounds} vueltas de circuito',
-          ),
-
         const SizedBox(height: 12),
         FilledButton.icon(
           onPressed: () => Navigator.push(
