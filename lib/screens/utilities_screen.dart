@@ -380,8 +380,32 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
     }
     if (names.isNotEmpty) _selectedExercise ??= names.first;
     final selected =
-        records.where((record) => record.name == _selectedExercise).toList()
-          ..sort((a, b) => a.date.compareTo(b.date));
+    records.where((record) => record.name == _selectedExercise).toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+// Agrupar por día y conservar únicamente la serie
+// con mayor peso levantado.
+final dailyMaxima = <DateTime, _LiftRecord>{};
+
+for (final record in selected) {
+  final day = DateTime(
+    record.date.year,
+    record.date.month,
+    record.date.day,
+  );
+
+  final current = dailyMaxima[day];
+
+  if (current == null ||
+      record.weight > current.weight ||
+      (record.weight == current.weight && record.rm > current.rm)) {
+    dailyMaxima[day] = record;
+  }
+}
+
+// Registros que se utilizarán exclusivamente para la gráfica.
+final chartRecords = dailyMaxima.values.toList()
+  ..sort((a, b) => a.date.compareTo(b.date));
     final bestWeight = selected.fold<double>(
       0,
       (best, item) => math.max(best, item.weight),
@@ -447,7 +471,7 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
           ),
           const SizedBox(height: 18),
           Text(
-            'EVOLUCIÓN · ${selected.length} series',
+            'EVOLUCIÓN · ${chartRecords.length} días',
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 10),
@@ -460,7 +484,7 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
             ),
             child: CustomPaint(
               painter: _ProgressPainter(
-                selected,
+                chartRecords,
                 colors.onSurface,
                 colors.onSurfaceVariant,
               ),

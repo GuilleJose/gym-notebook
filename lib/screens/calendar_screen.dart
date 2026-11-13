@@ -364,31 +364,24 @@ class _CalendarScreenState extends State<CalendarScreen> {
   // DETALLE DEL DÍA SELECCIONADO
   // --------------------------------------------------
 
+ 
   Widget _selectedDayDetails(
     List<WorkoutModel> routine,
     List<CompletedWorkoutEntry> completed,
   ) {
     final date = _selectedDate;
-
     final workout = _workoutForDay(routine, date);
-
     final completedEntries = _completedForDay(completed, date);
 
-    // Convertimos los ejercicios en una lista independiente
-    // y los ordenamos antes de crear los widgets.
     final exercises = workout?.exercises.toList() ?? [];
-
     exercises.sort((a, b) => a.order.compareTo(b.order));
 
     final now = DateTime.now();
-
     final today = DateTime(now.year, now.month, now.day);
-
     final isPast = date.isBefore(today);
 
     final dateLabel =
-        '${date.day} de ${months[date.month - 1]} '
-        'de ${date.year}';
+        '${date.day} de ${months[date.month - 1]} de ${date.year}';
 
     return Card(
       child: Padding(
@@ -398,9 +391,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
           children: [
             Text(
               dateLabel,
-              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-
             const SizedBox(height: 14),
 
             // ENTRENAMIENTO COMPLETADO
@@ -411,38 +406,66 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   SizedBox(width: 8),
                   Text(
                     'ENTRENAMIENTO COMPLETADO',
-                    style: TextStyle(color: green, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: green,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
-
               const SizedBox(height: 12),
 
-              ...completedEntries.map(
-                (entry) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.fitness_center, color: blue),
-                  title: Text(
-                    entry.workoutName,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: const Text('Entrenamiento realizado'),
-                ),
-              ),
+              ...completedEntries.map((entry) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.workoutName,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    if (entry.bodyWeight != null) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        'Peso corporal: ${entry.bodyWeight} kg',
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    ],
+
+                    const SizedBox(height: 12),
+
+                    if (entry.results.isEmpty)
+                      const Text(
+                        'No hay series registradas para este entrenamiento.',
+                        style: TextStyle(color: Colors.grey),
+                      )
+                    else
+                      ...entry.results.map(_completedExerciseDetails),
+
+                    const Divider(height: 28),
+                  ],
+                );
+              }),
             ]
+
             // DÍA DE DESCANSO
             else if (workout == null || workout.isRestDay) ...[
-              const Icon(Icons.hotel_outlined, size: 40, color: Colors.grey),
-
+              const Icon(
+                Icons.hotel_outlined,
+                size: 40,
+                color: Colors.grey,
+              ),
               const SizedBox(height: 8),
-
               const Text(
                 'DÍA DE DESCANSO',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-
               const Text('Hoy toca recuperar fuerzas.'),
             ]
+
             // ENTRENAMIENTO PENDIENTE O FUTURO
             else ...[
               Row(
@@ -465,9 +488,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 10),
-
               Text(
                 workout.name,
                 style: const TextStyle(
@@ -475,9 +496,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               Text('${exercises.length} ejercicios'),
 
               if (isPast) ...[
@@ -489,15 +508,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ],
 
               const SizedBox(height: 12),
-
               const Divider(),
 
-              // CADA EJERCICIO SE CONVIERTE EN UN WIDGET
-              ...exercises.map<Widget>((exercise) {
+              ...exercises.map((exercise) {
                 final subtitle = exercise.isTimed
                     ? '${exercise.durationSeconds ?? 0} segundos'
                     : '${exercise.sets} series · '
-                          '${exercise.minReps}-${exercise.maxReps} repeticiones';
+                        '${exercise.minReps}-${exercise.maxReps} repeticiones';
 
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -514,5 +531,149 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ),
       ),
     );
+  }
+
+  // --------------------------------------------------
+  // DETALLE DE UN EJERCICIO COMPLETADO
+  // --------------------------------------------------
+
+  Widget _completedExerciseDetails(
+    Map<String, dynamic> exercise,
+  ) {
+    final exerciseName =
+        exercise['exerciseName']?.toString() ?? 'Ejercicio';
+
+    final setsRaw = exercise['sets'];
+    final List<Map<String, dynamic>> sets = [];
+
+    if (setsRaw is List) {
+      for (final item in setsRaw) {
+        if (item is Map) {
+          sets.add(Map<String, dynamic>.from(item));
+        }
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.fitness_center,
+                color: blue,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  exerciseName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          if (sets.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(left: 28, top: 6),
+              child: Text(
+                'Sin series registradas',
+                style: TextStyle(color: Colors.grey),
+              ),
+            )
+          else ...[
+            const SizedBox(height: 8),
+
+            ...sets.map((set) {
+              final setNumber = set['setNumber'] ?? '-';
+              final weight = set['weight'];
+              final reps = set['reps'];
+              final rir = set['rir'];
+              final rm = set['rm'];
+              final duration = set['durationSeconds'];
+              final isCompleted = set['completed'] == true;
+
+              final isTimed = duration != null;
+
+              String details;
+
+              if (isTimed) {
+                details = '$duration segundos';
+              } else {
+                final parts = <String>[];
+
+                if (weight != null) {
+                  parts.add('${_formatWorkoutNumber(weight)} kg');
+                }
+
+                if (reps != null) {
+                  parts.add('$reps repeticiones');
+                }
+
+                if (rir != null) {
+                  parts.add('RIR $rir');
+                }
+
+                details = parts.isEmpty
+                    ? 'Sin datos registrados'
+                    : parts.join(' · ');
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(
+                  left: 28,
+                  top: 5,
+                  bottom: 5,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isCompleted
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      size: 17,
+                      color: isCompleted ? green : Colors.grey,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Serie $setNumber: $details',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                    if (rm != null)
+                      Text(
+                        'RM ${_formatWorkoutNumber(rm)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Evita mostrar decimales innecesarios.
+  String _formatWorkoutNumber(dynamic value) {
+    final number = num.tryParse(value.toString());
+
+    if (number == null) return value.toString();
+
+    return number % 1 == 0
+        ? number.toInt().toString()
+        : number.toStringAsFixed(1);
   }
 }

@@ -47,6 +47,8 @@ class _TrainingScreenState extends State<TrainingScreen> {
   Future<void> _saveQueue = Future<void>.value();
 
   int _secondsLeft = 0;
+  String? _restExerciseId;
+
   bool _saving = false;
   bool _automaticTrainingEnabled = false;
 
@@ -535,23 +537,47 @@ class _TrainingScreenState extends State<TrainingScreen> {
     _scheduleAutosave();
   }
 
-  void _startRest(int seconds) {
+  // Temporizador asociado al ejercicio que acaba de registrar una serie.
+  void _startRest(int seconds, {required String exerciseId}) {
     _timer?.cancel();
 
-    if (seconds <= 0) return;
+    if (seconds <= 0) {
+      setState(() {
+        _secondsLeft = 0;
+        _restExerciseId = null;
+      });
+      return;
+    }
 
-    setState(() => _secondsLeft = seconds);
+    setState(() {
+      _secondsLeft = seconds;
+      _restExerciseId = exerciseId;
+    });
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_secondsLeft <= 1) {
         timer.cancel();
 
         if (mounted) {
-          setState(() => _secondsLeft = 0);
+          setState(() {
+            _secondsLeft = 0;
+            _restExerciseId = null;
+          });
         }
       } else if (mounted) {
         setState(() => _secondsLeft--);
       }
+    });
+  }
+
+  void _stopRest() {
+    _timer?.cancel();
+
+    if (!mounted) return;
+
+    setState(() {
+      _secondsLeft = 0;
+      _restExerciseId = null;
     });
   }
 
@@ -594,11 +620,14 @@ class _TrainingScreenState extends State<TrainingScreen> {
       _reps[exercise.id]!.clear();
 
       _prefillLastSetValues();
-
-      _secondsLeft = exercise.restSeconds;
     });
 
-    _startRest(exercise.restSeconds);
+    // IMPORTANTE: se pasa el ID del ejercicio al temporizador.
+    _startRest(
+      exercise.restSeconds,
+      exerciseId: exercise.id,
+    );
+
     _scheduleAutosave();
   }
 
@@ -755,7 +784,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
                       ),
                     ),
                   _bodyWeightSection(),
-                  if (_secondsLeft > 0) _restTimer(),
                   Row(
                     children: [
                       Expanded(
@@ -865,7 +893,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
 
   Widget _restTimer() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
         color: const Color(0xFF17352F),
@@ -889,10 +917,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
           ),
           IconButton(
             tooltip: 'Detener descanso',
-            onPressed: () {
-              _timer?.cancel();
-              setState(() => _secondsLeft = 0);
-            },
+            onPressed: _stopRest,
             icon: const Icon(
               Icons.stop_circle_outlined,
               color: Colors.white,
@@ -1128,6 +1153,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
                     ),
                 ],
               ),
+
+            // El temporizador solo aparece debajo del ejercicio asociado.
+            if (_secondsLeft > 0 &&
+                _restExerciseId == exercise.id)
+              _restTimer(),
           ],
         ),
       ),
