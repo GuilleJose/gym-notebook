@@ -14,12 +14,73 @@ class CalendarService {
         .collection('entrenamientos_realizados');
   }
 
-  /// Obtiene la rutina semanal configurada.
+  DateTime _day(DateTime date) => DateTime(date.year, date.month, date.day);
+
+  String _sessionId(WorkoutModel workout, DateTime date) {
+    final day = _day(date);
+    final dateKey =
+        '${day.year}${day.month.toString().padLeft(2, '0')}${day.day.toString().padLeft(2, '0')}';
+    return '${dateKey}_${Uri.encodeComponent(workout.id)}';
+  }
+
   Future<List<WorkoutModel>> getWeeklyRoutine(String uid) {
     return _workoutService.getAllWorkouts(uid);
   }
 
-  /// Escucha los entrenamientos realizados de un mes.
+  /// Recupera la sesión de un entrenamiento en una fecha concreta.
+  /// Las nuevas sesiones utilizan un identificador único por día y rutina.
+  Future<CompletedWorkoutEntry?> getWorkoutSession({
+    required String uid,
+    required WorkoutModel workout,
+    required DateTime date,
+  }) async {
+    final document = _historyCollection(uid).doc(_sessionId(workout, date));
+    final snapshot = await document.get();
+
+    if (!snapshot.exists || snapshot.data() == null) return null;
+
+    return CompletedWorkoutEntry.fromMap(snapshot.id, snapshot.data()!);
+  }
+
+  /// Guarda o actualiza una sesión. Puede estar en curso o completada.
+  /// Siempre utiliza el mismo documento para ese entrenamiento y ese día.
+  Future<void> saveWorkoutSession({
+    required String uid,
+    required WorkoutModel workout,
+    required DateTime date,
+    required String status,
+    String notes = '',
+    double? bodyWeight,
+    List<Map<String, dynamic>> results = const [],
+  }) async {
+    if (status != 'inProgress' && status != 'completed') {
+      throw ArgumentError.value(status, 'status', 'Estado no válido');
+    }
+
+    final document = _historyCollection(uid).doc(_sessionId(workout, date));
+    final existing = await document.get();
+
+    final data = <String, dynamic>{
+      'workoutId': workout.id,
+      'workoutName': workout.name,
+      'date': Timestamp.fromDate(_day(date)),
+      'exercises': workout.exercises.map((e) => e.toMap()).toList(),
+      'results': results,
+      'notes': notes,
+      'bodyWeight': bodyWeight,
+      'status': status,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    if (!existing.exists) {
+      data['createdAt'] = FieldValue.serverTimestamp();
+    }
+
+    await document.set(data, SetOptions(merge: true));
+  }
+
+  /// Escucha los entrenamientos del mes.
+  /// Los documentos antiguos sin status se consideran completados.
   Stream<List<CompletedWorkoutEntry>> watchCompletedWorkouts(
     String uid,
     DateTime month,
@@ -33,25 +94,38 @@ class CalendarService {
         .orderBy('date')
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs.map((doc) {
-            return CompletedWorkoutEntry.fromMap(doc.id, doc.data());
-          }).toList();
+          return snapshot.docs
+              .where((doc) => _isCompleted(doc.data()))
+              .map(
+                (doc) => CompletedWorkoutEntry.fromMap(doc.id, doc.data()),
+              )
+              .toList();
         });
   }
 
+  /// Historial de entrenamientos completados.
+  /// Excluye borradores para que no afecten a récords ni progresión.
   Stream<List<CompletedWorkoutEntry>> watchAllCompletedWorkouts(String uid) {
     return _historyCollection(uid)
         .orderBy('date', descending: true)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
-              .map((doc) => CompletedWorkoutEntry.fromMap(doc.id, doc.data()))
+              .where((doc) => _isCompleted(doc.data()))
+              .map(
+                (doc) => CompletedWorkoutEntry.fromMap(doc.id, doc.data()),
+              )
               .toList(),
         );
   }
 
-  /// Guarda un entrenamiento realizado.
-  /// Lo conectaremos al botón de finalizar entrenamiento.
+  bool _isCompleted(Map<String, dynamic> data) {
+    // Compatibilidad con los entrenamientos guardados antes de añadir status.
+    return data['status'] != 'inProgress';
+  }
+
+  /// Compatibilidad con el método anterior.
+  /// Ahora actualiza la sesión del día en vez de crear un documento nuevo.
   Future<void> saveCompletedWorkout({
     required String uid,
     required WorkoutModel workout,
@@ -59,19 +133,16 @@ class CalendarService {
     String notes = '',
     double? bodyWeight,
     List<Map<String, dynamic>> results = const [],
-  }) async {
-    final document = _historyCollection(uid).doc();
-
-    await document.set({
-      'workoutId': workout.id,
-      'workoutName': workout.name,
-      'date': Timestamp.fromDate(DateTime(date.year, date.month, date.day)),
-      'exercises': workout.exercises.map((e) => e.toMap()).toList(),
-      'results': results,
-      'notes': notes,
-      'bodyWeight': bodyWeight,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+  }) {
+    return saveWorkoutSession(
+      uid: uid,
+      workout: workout,
+      date: date,
+      status: 'completed',
+      notes: notes,
+      bodyWeight: bodyWeight,
+      results: results,
+    );
   }
 }
 
@@ -82,6 +153,8 @@ class CompletedWorkoutEntry {
   final String workoutId;
   final List<Map<String, dynamic>> results;
   final double? bodyWeight;
+  final String notes;
+  final String status;
 
   const CompletedWorkoutEntry({
     required this.id,
@@ -90,21 +163,35 @@ class CompletedWorkoutEntry {
     required this.workoutId,
     this.results = const [],
     this.bodyWeight,
+    this.notes = '',
+    this.status = 'completed',
   });
 
-  factory CompletedWorkoutEntry.fromMap(String id, Map<String, dynamic> map) {
+  bool get isCompleted => status != 'inProgress';
+
+  factory CompletedWorkoutEntry.fromMap(
+    String id,
+    Map<String, dynamic> map,
+  ) {
     final dateValue = map['date'];
-    final date = dateValue is Timestamp ? dateValue.toDate() : DateTime.now();
+    final date = dateValue is Timestamp
+        ? dateValue.toDate()
+        : dateValue is DateTime
+            ? dateValue
+            : DateTime.now();
 
     return CompletedWorkoutEntry(
       id: id,
       date: date,
-      workoutName: map['workoutName'] ?? '',
-      workoutId: map['workoutId'] ?? '',
+      workoutName: map['workoutName']?.toString() ?? '',
+      workoutId: map['workoutId']?.toString() ?? '',
       results: (map['results'] as List<dynamic>? ?? [])
-          .map((item) => Map<String, dynamic>.from(item as Map))
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
           .toList(),
       bodyWeight: (map['bodyWeight'] as num?)?.toDouble(),
+      notes: map['notes']?.toString() ?? '',
+      status: map['status']?.toString() ?? 'completed',
     );
   }
 }

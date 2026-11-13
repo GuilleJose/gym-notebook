@@ -154,6 +154,8 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
           '${_estimatedRm.toStringAsFixed(1)} kg',
           'Fórmula de Epley',
         ),
+        const SizedBox(height: 16),
+        _rmBreakdown(),
         const SizedBox(height: 28),
         const Divider(),
         const SizedBox(height: 16),
@@ -199,6 +201,95 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
           'Clásica · peso levantado y peso corporal en kg',
         ),
       ],
+    );
+  }
+
+  Widget _rmBreakdown() {
+    final colors = Theme.of(context).colorScheme;
+    const targetReps = [2, 3, 4, 5, 6, 7, 8, 10, 12, 15];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'OTRAS MARCAS ESTIMADAS',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Carga aproximada que podrías levantar para cada número de repeticiones.',
+            style: TextStyle(
+              color: colors.onSurfaceVariant,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Table(
+            columnWidths: const {
+              0: FlexColumnWidth(1),
+              1: FlexColumnWidth(2),
+            },
+            children: [
+              TableRow(
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: colors.outlineVariant,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                children: [
+                  _rmTableCell('Repeticiones', isHeader: true),
+                  _rmTableCell('Carga estimada', isHeader: true),
+                ],
+              ),
+              for (final reps in targetReps)
+                TableRow(
+                  children: [
+                    _rmTableCell('${reps}RM'),
+                    _rmTableCell(
+                      _estimatedRm > 0
+                          ? '${(_estimatedRm / (1 + reps / 30)).toStringAsFixed(1)} kg'
+                          : '—',
+                      isValue: true,
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rmTableCell(
+    String value, {
+    bool isHeader = false,
+    bool isValue = false,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+      child: Text(
+        value,
+        style: TextStyle(
+          fontWeight: isHeader || isValue
+              ? FontWeight.w700
+              : FontWeight.normal,
+          color: isValue
+              ? const Color(0xFF4DD0A1)
+              : isHeader
+                  ? colors.onSurface
+                  : colors.onSurfaceVariant,
+        ),
+      ),
     );
   }
 
