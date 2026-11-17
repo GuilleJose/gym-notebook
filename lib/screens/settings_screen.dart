@@ -555,6 +555,9 @@ class _SettingsScreenState extends State<SettingsScreen>
           .where((item) => item.name.toLowerCase() == key)
           .firstOrNull;
       exerciseConfigs[key] = _RoutineExerciseConfig(
+        order: configured != null && configured.order > 0
+            ? configured.order
+            : catalog.indexOf(exercise) + 1,
         sets: _positiveOrDefault(configured?.sets, exercise.sets, 3),
         minReps: _positiveOrDefault(configured?.minReps, exercise.minReps, 8),
         maxReps: _positiveOrDefault(configured?.maxReps, exercise.maxReps, 12),
@@ -630,10 +633,20 @@ class _SettingsScreenState extends State<SettingsScreen>
                               right: 8,
                               bottom: 12,
                             ),
-                            child: exercise.muscleGroup == 'Cardio'
-                                ? _routineNumberField(
-                                    exerciseConfigs[exercise.name
-                                            .toLowerCase()]!
+                            child: Column(
+                              children: [
+                                _routineNumberField(
+                                  exerciseConfigs[exercise.name.toLowerCase()]!
+                                      .order,
+                                  'Orden',
+                                  onChanged: () => setDialogState(
+                                    () => exerciseValidation = null,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                if (exercise.muscleGroup == 'Cardio')
+                                  _routineNumberField(
+                                    exerciseConfigs[exercise.name.toLowerCase()]!
                                         .durationMinutes,
                                     'Duración',
                                     suffix: 'min',
@@ -641,7 +654,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                                       () => exerciseValidation = null,
                                     ),
                                   )
-                                : Row(
+                                else
+                                  Row(
                                     children: [
                                       Expanded(
                                         child: _routineNumberField(
@@ -680,6 +694,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                                       ),
                                     ],
                                   ),
+                              ],
+                            ),
                           ),
                       ],
                       if (exerciseValidation != null)
@@ -705,6 +721,8 @@ class _SettingsScreenState extends State<SettingsScreen>
               onPressed: () {
                 final invalid = selected.any((key) {
                   final config = exerciseConfigs[key]!;
+                  final order = int.tryParse(config.order.text);
+                  if (order == null || order < 1) return true;
                   final exercise = catalog.firstWhere(
                     (item) => item.name.toLowerCase() == key,
                   );
@@ -728,7 +746,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                         ? 'Escribe un nombre y selecciona ejercicios.'
                         : selected.isEmpty
                         ? 'Selecciona al menos un ejercicio.'
-                        : 'Revisa series, reps y duración de cada ejercicio.';
+                        : 'Revisa el orden, las series, reps y duración de cada ejercicio.';
                   });
                   return;
                 }
@@ -737,6 +755,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   _RoutineDraft(name.text.trim(), day, selected, {
                     for (final key in selected)
                       key: _RoutineExerciseValues(
+                        order: int.parse(exerciseConfigs[key]!.order.text),
                         sets:
                             catalog
                                     .firstWhere(
@@ -808,30 +827,27 @@ class _SettingsScreenState extends State<SettingsScreen>
           (exercise) =>
               result.exerciseNames.contains(exercise.name.toLowerCase()),
         )
-        .toList()
-        .asMap()
-        .entries
-        .map((entry) {
-          final config = result.exerciseValues[entry.value.name.toLowerCase()]!;
-          final isCardio = entry.value.muscleGroup == 'Cardio';
+        .map((exercise) {
+          final config = result.exerciseValues[exercise.name.toLowerCase()]!;
+          final isCardio = exercise.muscleGroup == 'Cardio';
           return ExerciseModel(
-            id: entry.value.id,
-            name: entry.value.name,
-            muscleGroup: entry.value.muscleGroup,
-            order: entry.key + 1,
+            id: exercise.id,
+            name: exercise.name,
+            muscleGroup: exercise.muscleGroup,
+            order: config.order,
             sets: config.sets,
             minReps: config.minReps,
             maxReps: config.maxReps,
-            restSeconds: isCardio ? 0 : entry.value.restSeconds,
-            progressionIncrementKg: entry.value.progressionIncrementKg,
-            type: isCardio ? 'cardio' : entry.value.type,
-            notes: entry.value.notes,
-            isTimed: isCardio || entry.value.isTimed,
-            durationSeconds:
-                config.durationSeconds ?? entry.value.durationSeconds,
+            restSeconds: isCardio ? 0 : exercise.restSeconds,
+            progressionIncrementKg: exercise.progressionIncrementKg,
+            type: isCardio ? 'cardio' : exercise.type,
+            notes: exercise.notes,
+            isTimed: isCardio || exercise.isTimed,
+            durationSeconds: config.durationSeconds ?? exercise.durationSeconds,
           );
         })
-        .toList();
+        .toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
     final sameDay = workouts
         .where((item) => item.dayOfWeek == result.day)
         .firstOrNull;
@@ -1034,22 +1050,26 @@ class _RoutineDraft {
 }
 
 class _RoutineExerciseConfig {
+  final TextEditingController order;
   final TextEditingController sets;
   final TextEditingController minReps;
   final TextEditingController maxReps;
   final TextEditingController durationMinutes;
 
   _RoutineExerciseConfig({
+    required int order,
     required int sets,
     required int minReps,
     required int maxReps,
     required int durationMinutes,
-  }) : sets = TextEditingController(text: '$sets'),
+  }) : order = TextEditingController(text: '$order'),
+       sets = TextEditingController(text: '$sets'),
        minReps = TextEditingController(text: '$minReps'),
        maxReps = TextEditingController(text: '$maxReps'),
        durationMinutes = TextEditingController(text: '$durationMinutes');
 
   void dispose() {
+    order.dispose();
     sets.dispose();
     minReps.dispose();
     maxReps.dispose();
@@ -1058,6 +1078,7 @@ class _RoutineExerciseConfig {
 }
 
 class _RoutineExerciseValues {
+  final int order;
   final int sets;
   final int minReps;
   final int maxReps;
@@ -1065,6 +1086,7 @@ class _RoutineExerciseValues {
   final double progressionIncrementKg;
 
   const _RoutineExerciseValues({
+    required this.order,
     required this.sets,
     required this.minReps,
     required this.maxReps,
