@@ -38,9 +38,15 @@ class _DailyActivityCardState extends State<DailyActivityCard> {
       if (authorized) {
         await _refresh();
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('ERROR COMPROBANDO HEALTH CONNECT: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
-      setState(() => _error = 'No se pudo comprobar Health Connect.');
+
+      setState(() {
+        _error = 'No se pudo comprobar Health Connect: $e';
+      });
     }
   }
 
@@ -51,30 +57,47 @@ class _DailyActivityCardState extends State<DailyActivityCard> {
     });
 
     try {
+      debugPrint('Solicitando permisos de Health Connect...');
+
       final authorized = await _service.requestPermissions();
+
+      debugPrint('Resultado de autorización: $authorized');
 
       if (!mounted) return;
 
       if (!authorized) {
         setState(() {
           _loading = false;
-          _error = 'No se han concedido los permisos necesarios.';
+          _error =
+              'Health Connect no ha concedido los permisos. '
+              'Comprueba que está disponible y que los permisos '
+              'están declarados en AndroidManifest.xml.';
         });
         return;
       }
 
-      setState(() => _authorized = true);
+      setState(() {
+        _authorized = true;
+        _error = null;
+      });
+
       await _refresh();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('ERROR HEALTH CONNECT: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
+
       setState(() {
         _loading = false;
-        _error = 'Error al solicitar permisos.';
+        _error = 'Error al solicitar permisos: $e';
       });
     }
   }
 
   Future<void> _refresh() async {
+    if (!mounted) return;
+
     setState(() {
       _loading = true;
       _error = null;
@@ -89,19 +112,21 @@ class _DailyActivityCardState extends State<DailyActivityCard> {
         _activity = activity;
         _loading = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('ERROR LEYENDO ACTIVIDAD: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
 
       setState(() {
         _loading = false;
-        _error = 'No se han podido leer los datos de actividad.';
+        _error = 'No se han podido leer los datos: $e';
       });
     }
   }
 
   String _formatNumber(double? value, {int decimals = 0}) {
     if (value == null) return '--';
-
     return value.toStringAsFixed(decimals);
   }
 
@@ -173,7 +198,9 @@ class _DailyActivityCardState extends State<DailyActivityCard> {
                     padding: const EdgeInsets.only(bottom: 5),
                     child: Text(
                       'pasos',
-                      style: TextStyle(color: colors.onSurfaceVariant),
+                      style: TextStyle(
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],
@@ -205,7 +232,9 @@ class _DailyActivityCardState extends State<DailyActivityCard> {
                   ),
                   Text(
                     '${(progress * 100).toStringAsFixed(1)} %',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -241,6 +270,11 @@ class _DailyActivityCardState extends State<DailyActivityCard> {
                 const SizedBox(height: 12),
                 const LinearProgressIndicator(),
               ],
+            ],
+
+            if (_loading && !_authorized) ...[
+              const SizedBox(height: 12),
+              const LinearProgressIndicator(),
             ],
 
             if (_error != null) ...[
