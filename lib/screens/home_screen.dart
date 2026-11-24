@@ -1,9 +1,11 @@
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/exercise_model.dart';
 import '../models/workout_model.dart';
 import '../services/workout_service.dart';
+import '../widgets/daily_activity_card.dart';
 
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
@@ -84,39 +86,48 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: StreamBuilder<WorkoutModel?>(
-        stream: WorkoutService().watchWorkout(user.uid, today),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
 
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Error al cargar el entrenamiento:\n${snapshot.error}',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
+      body: Column(
+        children: [
+          const DailyActivityCard(),
 
-          final workout = snapshot.data;
+          Expanded(
+            child: StreamBuilder<WorkoutModel?>(
+              stream: WorkoutService().watchWorkout(user.uid, today),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          if (workout == null) {
-            return const Center(
-              child: Text('No hay entrenamiento configurado para hoy.'),
-            );
-          }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'Error al cargar el entrenamiento:\n${snapshot.error}',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
 
-          if (workout.isRestDay) {
-            return _restDay();
-          }
+                final workout = snapshot.data;
 
-          return _workoutContent(context, workout, today);
-        },
+                if (workout == null) {
+                  return const Center(
+                    child: Text('No hay entrenamiento configurado para hoy.'),
+                  );
+                }
+
+                if (workout.isRestDay) {
+                  return _restDay();
+                }
+
+                return _workoutContent(context, workout, today);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
